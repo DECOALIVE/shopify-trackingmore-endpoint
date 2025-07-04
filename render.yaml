@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: trackingmore-endpoint
+    name: shopify-trackingmore-endpoint
     env: python
     repo: https://github.com/tu_usuario/tu_repositorio
     branch: main
