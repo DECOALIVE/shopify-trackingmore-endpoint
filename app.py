@@ -2,10 +2,11 @@ from flask import Flask, request
 import os
 import json
 import requests
+from datetime import datetime
 
 app = Flask(__name__)
 
-# Mapeo de estados TrackingMore a Amazon Vendor
+# Mapeo de estados TrackingMore → Amazon SP‑API
 STATUS_MAP = {
     'inforeceived': 'InfoReceived',
     'transit': 'InTransit',
@@ -15,15 +16,15 @@ STATUS_MAP = {
     'pending': 'ReadyForPickup'
 }
 
-# 🔐 Función para refrescar el token de acceso de Amazon
+# Función para refrescar token de Amazon
 def refresh_amazon_token():
-    client_id = "<TU_CLIENT_ID>"
-    client_secret = "<TU_CLIENT_SECRET>"
-    refresh_token = "<TU_REFRESH_TOKEN>"
+    client_id = os.getenv("AMAZON_CLIENT_ID")
+    client_secret = os.getenv("AMAZON_CLIENT_SECRET")
+    refresh_token = os.getenv("AMAZON_REFRESH_TOKEN")
     lwa_endpoint = "https://api.amazon.com/auth/o2/token"
 
     try:
-        response = requests.post(
+        resp = requests.post(
             lwa_endpoint,
             headers={"Content-Type": "application/x-www-form-urlencoded"},
             data={
@@ -33,70 +34,62 @@ def refresh_amazon_token():
                 "client_secret": client_secret
             }
         )
-        response.raise_for_status()
-        access_token = response.json().get("access_token")
-        print("🔑 Token de acceso actualizado.")
-        return access_token
-    except Exception as e:
-        print("❌ Error al refrescar el token de Amazon:", str(e))
+        resp.raise_for_status()
+        token = resp.json().get("access_token")
+        print("🔑 Token de acceso de Amazon renovado.")
+        return token
+    except Exception as ex:
+        print("❌ Error refrescando token de Amazon:", str(ex))
         return None
 
-# 🎯 Webhook de TrackingMore
+# Simulación de llamada real a SP‑API
+def send_to_amazon(payload):
+    print("📤 Simulación de envío a Amazon:")
+    print(json.dumps(payload, indent=2))
+
+    # Sólo descomentar cuando tengas los tokens y permisos
+    # access_token = refresh_amazon_token()
+    # if access_token:
+    #     response = requests.post(
+    #         "https://sellingpartnerapi-eu.amazon.com/vendor/directFulfillment/shipping/v1/shipmentStatusUpdates",
+    #         headers={
+    #             "Authorization": f"Bearer {access_token}",
+    #             "x-amz-access-token": access_token,
+    #             "Content-Type": "application/json"
+    #         },
+    #         json={"shipmentStatusUpdates": [payload]}
+    #     )
+    #     print("🛰️ Respuesta API Amazon:", response.status_code, response.text)
+    # else:
+    #     print("⚠️ No se envió a Amazon por falta de token.")
+
+# Crea payload según formato SP‑API
+def crear_payload_amazon(tracking_data):
+    status_raw = tracking_data.get("delivery_status", "").lower()
+    status = STATUS_MAP.get(status_raw, "InTransit")
+    timestamp = tracking_data.get("latest_checkpoint_time") or datetime.utcnow().isoformat()
+
+    return {
+        "trackingNumber": tracking_data.get("tracking_number"),
+        "eventCode": status,
+        "eventTime": timestamp,
+        "location": {"countryCode": "ES"}
+    }
+
+# Webhook de TrackingMore
 @app.route("/trackingmore/webhook", methods=["POST"])
-def webhook():
-    try:
-        data = request.get_json(force=True)
-        print("✅ Webhook recibido:")
-        print(json.dumps(data, indent=2))
+def trackingmore_webhook():
+    data = request.get_json(force=True)
+    print("🔔 Evento recibido del webhook:")
+    print(json.dumps(data, indent=2))
 
-        # Extraer datos clave
-        tracking = data.get("data", {})
-        tracking_number = tracking.get("tracking_number")
-        delivery_status = tracking.get("delivery_status")
-        event_time = tracking.get("latest_checkpoint_time")
+    if data and "data" in data:
+        tracking_data = data["data"]
+        amazon_payload = crear_payload_amazon(tracking_data)
+        send_to_amazon(amazon_payload)
 
-        # Traducir estado a Amazon Vendor
-        amazon_status = STATUS_MAP.get(delivery_status.lower(), "InTransit")
-
-        # Crear payload para Amazon
-        amazon_payload = {
-            "shipmentStatusUpdates": [
-                {
-                    "trackingNumber": tracking_number,
-                    "eventCode": amazon_status,
-                    "eventTime": event_time or "2025-01-01T00:00:00Z",
-                    "location": {
-                        "countryCode": "ES"
-                    }
-                }
-            ]
-        }
-
-        print("📦 Payload preparado para Amazon Vendor:")
-        print(json.dumps(amazon_payload, indent=2))
-
-        # 🚀 Enviar a Amazon (descomenta cuando tengas las credenciales)
-        # access_token = refresh_amazon_token()
-        # if access_token:
-        #     response = requests.post(
-        #         "https://sellingpartnerapi-eu.amazon.com/vendor/directFulfillment/shipping/v1/shipmentStatusUpdates",
-        #         headers={
-        #             "Authorization": f"Bearer {access_token}",
-        #             "x-amz-access-token": access_token,
-        #             "Content-Type": "application/json"
-        #         },
-        #         json=amazon_payload
-        #     )
-        #     print("🛰️ Respuesta de Amazon:", response.status_code, response.text)
-        # else:
-        #     print("⚠️ No se pudo enviar a Amazon por falta de token.")
-
-        return "Webhook recibido y procesado", 200
-
-    except Exception as e:
-        print("❌ Error al procesar el webhook:", str(e))
-        return "Error", 500
+    return "OK", 200
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
+    port = int(os.getenv("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
