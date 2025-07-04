@@ -91,6 +91,10 @@ def trackingmore_webhook():
         send_to_amazon(amazon_payload)
 
     return "OK", 200
+    
+@app.route("/")
+def home():
+    return "Webhook Flask está activo 🚀"
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 10000))
