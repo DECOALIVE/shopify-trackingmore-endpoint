@@ -1,8 +1,17 @@
 services:
   - type: web
-    name: shopify-tracking-endpoint
+    name: trackingmore-endpoint
     env: python
-    plan: free
-    buildCommand: pip install -r requirements.txt
-    startCommand: python app.py
-    envVars: []
+    repo: https://github.com/tu_usuario/tu_repositorio
+    branch: main
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "python app.py"
+    envVars:
+      - key: AMAZON_CLIENT_ID
+        fromGroup: amazon-tracking-env
+      - key: AMAZON_CLIENT_SECRET
+        fromGroup: amazon-tracking-env
+      - key: AMAZON_REFRESH_TOKEN
+        fromGroup: amazon-tracking-env
+      - key: PORT
+        value: 10000
