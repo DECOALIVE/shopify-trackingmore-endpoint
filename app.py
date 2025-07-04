@@ -3,6 +3,9 @@ import os
 import json
 import requests
 from datetime import datetime
+from dotenv import load_dotenv
+
+load_dotenv()  # Esto es útil para entorno local con .env
 
 app = Flask(__name__)
 
