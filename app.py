@@ -2,7 +2,7 @@ from flask import Flask, request
 import os
 import json
 import requests
-from datetime import datetime
+from datetime import datetime, timezone
 from dotenv import load_dotenv
 
 load_dotenv()  # Esto es útil para entorno local con .env
@@ -70,7 +70,7 @@ def send_to_amazon(payload):
 def crear_payload_amazon(tracking_data):
     status_raw = tracking_data.get("delivery_status", "").lower()
     status = STATUS_MAP.get(status_raw, "InTransit")
-    timestamp = tracking_data.get("latest_checkpoint_time") or datetime.utcnow().isoformat()
+timestamp = tracking_data.get("latest_checkpoint_time") or datetime.now(timezone.utc).isoformat()
 
     return {
         "trackingNumber": tracking_data.get("tracking_number"),
